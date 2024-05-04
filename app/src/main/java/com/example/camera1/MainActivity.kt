@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
 
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
+    private var isPhoto = true
 
     private lateinit var cameraExecutor: ExecutorService
     // Select back camera as a default
@@ -88,8 +89,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Set up the listeners for take photo and video capture buttons
-        viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
-        viewBinding.videoCaptureButton.setOnClickListener { captureVideo() }
+        viewBinding.imageCaptureButton.setOnClickListener {
+            takePhoto()
+        }
+
+        viewBinding.videoCaptureButton.setOnClickListener {
+//            isPhoto = !isPhoto
+            captureVideo()
+        }
+
         viewBinding.switchCamera.setOnClickListener {
             lensFacing = if(lensFacing == CameraSelector.LENS_FACING_BACK) {
                 CameraSelector.LENS_FACING_FRONT
@@ -190,7 +198,7 @@ class MainActivity : AppCompatActivity() {
                 when(recordEvent) {
                     is VideoRecordEvent.Start -> {
                         viewBinding.videoCaptureButton.apply {
-                            text = getString(R.string.stop_capture)
+//                            text = getString(R.string.stop_capture)
                             isEnabled = true
                         }
                     }
@@ -208,7 +216,7 @@ class MainActivity : AppCompatActivity() {
                                     "${recordEvent.error}")
                         }
                         viewBinding.videoCaptureButton.apply {
-                            text = getString(R.string.start_capture)
+//                            text = getString(R.string.start_capture)
                             isEnabled = true
                         }
                     }
