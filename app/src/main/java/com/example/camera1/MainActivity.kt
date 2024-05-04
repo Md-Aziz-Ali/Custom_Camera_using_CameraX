@@ -15,8 +15,12 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
+import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
@@ -31,6 +35,7 @@ import androidx.camera.video.QualitySelector
 import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker
+import androidx.core.view.isGone
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -90,12 +95,24 @@ class MainActivity : AppCompatActivity() {
 
         // Set up the listeners for take photo and video capture buttons
         viewBinding.imageCaptureButton.setOnClickListener {
-            takePhoto()
+//            takePhoto()
+            if(isPhoto) {
+                takePhoto()
+            }
+            else {
+                captureVideo()
+            }
         }
 
         viewBinding.videoCaptureButton.setOnClickListener {
-//            isPhoto = !isPhoto
-            captureVideo()
+            isPhoto = !isPhoto
+
+            if(isPhoto) {
+                viewBinding.imageCaptureButton.setImageResource(R.drawable.camera)
+            }
+            else {
+                viewBinding.imageCaptureButton.setImageResource(R.drawable.circle)
+            }
         }
 
         viewBinding.switchCamera.setOnClickListener {
@@ -106,7 +123,7 @@ class MainActivity : AppCompatActivity() {
                 CameraSelector.LENS_FACING_BACK
             }
             bindCameraUserCases()
-            Toast.makeText(this, "Hello1", Toast.LENGTH_SHORT).show()
+//            Toast.makeText(this, "Hello1", Toast.LENGTH_SHORT).show()
         }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -160,14 +177,19 @@ class MainActivity : AppCompatActivity() {
         val videoCapture = this.videoCapture ?: return
 
         viewBinding.videoCaptureButton.isEnabled = false
+        viewBinding.switchCamera.visibility = View.GONE
+        viewBinding.videoCaptureButton.visibility = View.GONE
+
 
         val curRecording = recording
         if (curRecording != null) {
             // Stop the current recording session.
             curRecording.stop()
+            stopRecording()
             recording = null
             return
         }
+        startRecording()
 
         // create and start a new recording session
         val name = SimpleDateFormat(FILENAME_FORMAT, Locale.US)
@@ -198,7 +220,6 @@ class MainActivity : AppCompatActivity() {
                 when(recordEvent) {
                     is VideoRecordEvent.Start -> {
                         viewBinding.videoCaptureButton.apply {
-//                            text = getString(R.string.stop_capture)
                             isEnabled = true
                         }
                     }
@@ -216,9 +237,11 @@ class MainActivity : AppCompatActivity() {
                                     "${recordEvent.error}")
                         }
                         viewBinding.videoCaptureButton.apply {
-//                            text = getString(R.string.start_capture)
                             isEnabled = true
                         }
+                        viewBinding.switchCamera.visibility = View.VISIBLE
+                        viewBinding.videoCaptureButton.visibility = View.VISIBLE
+
                     }
                 }
             }
@@ -246,7 +269,6 @@ class MainActivity : AppCompatActivity() {
             imageCapture = ImageCapture.Builder().build()
 
             // Select back camera as a default
-//            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
             cameraSelector = CameraSelector.Builder()
                 .requireLensFacing(lensFacing)
                 .build()
@@ -298,8 +320,6 @@ class MainActivity : AppCompatActivity() {
     private fun bindCameraUserCases() {
 
         val preview = Preview.Builder()
-//            .setResolutionSelector(resolutionSelector)
-//            .setTargetRotation(rotation)
             .build()
             .also {
                 it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
@@ -312,17 +332,13 @@ class MainActivity : AppCompatActivity() {
                     FallbackStrategy.higherQualityOrLowerThan(Quality.SD)
                 )
             )
-//            .setAspectRatio(aspectRatio)
             .build()
 
         videoCapture = VideoCapture.withOutput(recorder).apply {
-//            targetRotation = rotation
         }
 
         imageCapture = ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-//            .setResolutionSelector(resolutionSelector)
-//            .setTargetRotation(rotation)
             .build()
 
         cameraSelector = CameraSelector.Builder()
@@ -335,10 +351,41 @@ class MainActivity : AppCompatActivity() {
             camera = cameraProvider.bindToLifecycle(
                 this, cameraSelector, preview, imageCapture,videoCapture
             )
-//            setUpZoomTapToFocus()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
+    private val handler = Handler(Looper.getMainLooper())
+    private val updateTimer = object : Runnable{
+        override fun run() {
+            val currentTime = SystemClock.elapsedRealtime() - viewBinding.recordingTimer.base
+            val timeString = currentTime.toFormattedTime()
+            viewBinding.recordingTimer.text = timeString
+            handler.postDelayed(this,1000)
+        }
+    }
 
+    private fun Long.toFormattedTime():String{
+        val seconds = ((this / 1000) % 60).toInt()
+        val minutes = ((this / (1000 * 60)) % 60).toInt()
+        val hours = ((this / (1000 * 60 * 60)) % 24).toInt()
+
+        return if (hours >0){
+            String.format("%02d:%02d:%02d",hours,minutes,seconds)
+        }else{
+            String.format("%02d:%02d",minutes,seconds)
+        }
+    }
+
+    private fun startRecording(){
+        viewBinding.recordingTimer.visibility = View.VISIBLE
+        viewBinding.recordingTimer.base = SystemClock.elapsedRealtime()
+        viewBinding.recordingTimer.start()
+        handler.post(updateTimer)
+    }
+    private fun stopRecording(){
+        viewBinding.recordingTimer.visibility = View.GONE
+        viewBinding.recordingTimer.stop()
+        handler.removeCallbacks(updateTimer)
+    }
 }
